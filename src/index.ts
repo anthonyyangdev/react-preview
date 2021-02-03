@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import child_process from 'child_process';
 import YAML from 'yaml';
-import {PreviewConfig, PropsConfig} from "./previewConfig";
+import {getComponentName, getImportStyle, getOutputFile, getProps, PreviewConfig, PropsConfig} from "./previewConfig";
 
 const defaultOutputFile = "./src/preview-tools.tsx";
 const typeCode = `
@@ -28,58 +28,12 @@ function buildWebsiteConfig() {
     fs.writeFileSync(defaultOutputFile, configCode.join("\n"));
 }
 
-function parseObject(object: Record<string, unknown>) {
-    const value: Record<string, unknown> = {};
-    Object.entries(object).forEach(([k, v]) => {
-        value[k] = parseValue(v);
-    });
-    return value;
-}
-
-function parseNumber(number: number): number {
-    return number
-}
-
-function parseFunction(fn: string): Function {
-    return Function(`"use strict";return (${fn})`)(); // eslint-disable-line
-}
-
-function parseArray(arr: PropsConfig[]): unknown[] {
-    return arr.map(parseValue);
-}
-
-function parseValue(props: PropsConfig): unknown {
-    if (Array.isArray(props)) {
-        return parseArray(props);
-    }
-    if (typeof props !== "object") {
-        return props;
-    }
-    if (props == null) {
-        return {};
-    }
-    if ('type' in props) {
-        // const {value, type} = props as Record<'type' | 'value', unknown>;
-        switch (props.type) {
-            case 'object':
-                return parseObject(props.value);
-            case 'number':
-                return parseNumber(props.value);
-            case 'string':
-                return props.value;
-            case 'function':
-                return parseFunction(props.value);
-            default:
-                throw new Error("Invalid type in preview.yaml: " + props.type);
-        }
-    }
-    return parseObject(props);
-}
-
 function buildPreviewConfig(componentPath: string) {
     const componentProps = {};
+    const codeString: string[] = [typeCode];
     let outputFile = defaultOutputFile;
 
+    let importPath: string;
     if (fs.statSync(componentPath).isDirectory()) {
         // Find preview.yaml
         const previewYaml = path.join(componentPath, "preview.yaml");
@@ -87,23 +41,41 @@ function buildPreviewConfig(componentPath: string) {
             throw new Error("Cannot find preview.yaml file");
         }
         const config: PreviewConfig = YAML.parse(fs.readFileSync(previewYaml, 'utf-8'));
-        const {source, output, props} = config;
+        componentPath = path.join(componentPath, config.source);
+        const importStyle = getImportStyle(config);
+        const componentName = getComponentName(config);
+        const relativePath = path.relative(path.dirname(outputFile), componentPath);
+        const ext = path.extname(relativePath);
+        importPath = "." + path.sep + relativePath.slice(0, relativePath.length - ext.length);
 
-        // Update output file if possible
-        outputFile = output ?? outputFile;
-
-        componentPath = path.join(componentPath, source);
-        if (props != null && typeof props === "object") {
-            Object.assign(componentProps, parseValue(props));
+        switch (importStyle) {
+            case "default":
+                codeString.push(`import ${componentName} from '${importPath}'`)
+                break;
+            case "target":
+                codeString.push(`import {${componentName}} from '${importPath}'`)
+                break;
+            case "namespace":
+                codeString.push(`import * as ${componentName} from '${importPath}'`)
+                break;
+            case "require":
+                codeString.push(`const ${componentName} from require('${importPath}')`)
+                break;
         }
+        outputFile = getOutputFile(config);
+        Object.assign(componentProps, getProps(config));
+    } else {
+        const relativePath = path.relative(path.dirname(outputFile), componentPath);
+        const ext = path.extname(relativePath);
+        importPath = "." + path.sep + relativePath.slice(0, relativePath.length - ext.length);
+        codeString.push(`import MyComponent from '${importPath}'`)
     }
-    const relativePath = path.relative(path.dirname(outputFile), componentPath);
-    const ext = path.extname(relativePath);
-    const importPath = "." + path.sep + relativePath.slice(0, relativePath.length - ext.length);
-    const importStmt = `import MyComponent from '${importPath}'`;
+    if (!fs.existsSync(componentPath)) {
+        throw new Error(`Error: Component file does not exist: ${componentPath}`);
+    }
 
     const propsArg = Object.entries(componentProps)
-    .map(([k, v]) => `${k}={${typeof v === 'object' ? JSON.stringify(v, undefined, 2) : v}}`).join(" ");
+        .map(([k, v]) => `${k}={${typeof v === 'object' ? JSON.stringify(v, undefined, 2) : v}}`).join(" ");
 
     const getModeFn = `export const getMode = (): DevMode => {
         return {
@@ -112,13 +84,8 @@ function buildPreviewConfig(componentPath: string) {
             source: '${importPath}'
         };
     };`;
-    if (!fs.existsSync(componentPath)) {
-        throw new Error(`Error: Component file does not exist: ${componentPath}`);
-    }
-
-    const configCode = [importStmt, typeCode, getModeFn];
-
-    fs.writeFileSync(outputFile, configCode.join("\n"));
+    codeString.push(getModeFn)
+    fs.writeFileSync(outputFile, codeString.join("\n"));
 }
 
 /**

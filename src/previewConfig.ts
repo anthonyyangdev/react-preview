@@ -1,3 +1,4 @@
+import path from "path";
 
 const defaultOutputFile = "./src/preview-tools.tsx";
 const defaultLanguage: LanguageOutput = "ts";
@@ -16,6 +17,19 @@ export function getDimensions(config: PreviewConfig): {height: string, width: st
 }
 export function getImportStyle(config: PreviewConfig): ImportStyle {
     return config.importStyle ?? defaultImportStyle;
+}
+export function getComponentName(config: PreviewConfig): string {
+    const {componentName, source} = config;
+    if (componentName != null) return componentName;
+
+    const basename = path.basename(source);
+    let extension = path.extname(source);
+    let filename = basename.slice(0, basename.length - extension.length);
+    while (!filename.match(/^[a-zA-Z_][a-zA-Z_0-9]*$/)) {
+        extension = path.extname(filename);
+        filename = basename.slice(0, filename.length - extension.length);
+    }
+    return filename;
 }
 
 /**
@@ -73,8 +87,8 @@ export function getProps(config: PreviewConfig): unknown {
 type LanguageOutput = "ts" | "js";
 type ImportStyle = "default" | "target" | "namespace" | "require";
 export type PreviewConfig = {
-    id: string;
     source: string;
+    componentName?: string;
 
     // Defaults to src/preview-tools.tsx
     output?: string;
