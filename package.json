@@ -1,0 +1,21 @@
+{
+  "name": "react-preview",
+  "description": "Preview tool for React projects",
+  "version": "1.0.0",
+  "main": "out/index.js",
+  "license": "MIT",
+  "keywords": [
+    "preivew",
+    "react",
+    "reactjs"
+  ],
+  "author": "Anthony Yang",
+  "dependencies": {
+    "@types/node": "^14.14.22",
+    "node": "^15.7.0",
+    "yaml": "^1.10.0"
+  },
+  "devDependencies": {
+    "@types/yaml": "^1.9.7"
+  }
+}
