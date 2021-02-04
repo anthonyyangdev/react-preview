@@ -4,10 +4,11 @@
   "version": "1.0.0",
   "main": "out/index.js",
   "license": "MIT",
+  "bin": "./out/index.js",
   "keywords": [
     "preivew",
     "react",
-    "reactjs"
+    "reactjres"
   ],
   "author": "Anthony Yang",
   "dependencies": {

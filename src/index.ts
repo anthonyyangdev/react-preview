@@ -1,9 +1,9 @@
-
+#!/usr/bin/env node
 import fs from 'fs';
 import path from 'path';
 import child_process from 'child_process';
 import YAML from 'yaml';
-import {getComponentName, getImportStyle, getOutputFile, getProps, PreviewConfig, PropsConfig} from "./previewConfig";
+import {getComponentName, getDimensions, getImportStyle, getOutputFile, getProps, PreviewConfig} from "./previewConfig";
 
 const defaultOutputFile = "./src/preview-tools.tsx";
 const typeCode = `
@@ -28,12 +28,25 @@ function buildWebsiteConfig() {
     fs.writeFileSync(defaultOutputFile, configCode.join("\n"));
 }
 
+function isFunction(functionToCheck: unknown) {
+    return {}.toString.call(functionToCheck) === '[object Function]';
+}
+function convertToCodeString(value: unknown): string {
+    if (value == null || isFunction(value)) {
+        return `${value}`;
+    }
+    return JSON.stringify(value);
+}
+
 function buildPreviewConfig(componentPath: string) {
     const componentProps = {};
-    const codeString: string[] = [typeCode];
+    const codeString: string[] = [];
     let outputFile = defaultOutputFile;
+    let height = "100%";
+    let width = "100%";
 
     let importPath: string;
+    let componentName = "MyComponent";
     if (fs.statSync(componentPath).isDirectory()) {
         // Find preview.yaml
         const previewYaml = path.join(componentPath, "preview.yaml");
@@ -43,7 +56,7 @@ function buildPreviewConfig(componentPath: string) {
         const config: PreviewConfig = YAML.parse(fs.readFileSync(previewYaml, 'utf-8'));
         componentPath = path.join(componentPath, config.source);
         const importStyle = getImportStyle(config);
-        const componentName = getComponentName(config);
+        componentName = getComponentName(config);
         const relativePath = path.relative(path.dirname(outputFile), componentPath);
         const ext = path.extname(relativePath);
         importPath = "." + path.sep + relativePath.slice(0, relativePath.length - ext.length);
@@ -63,6 +76,9 @@ function buildPreviewConfig(componentPath: string) {
                 break;
         }
         outputFile = getOutputFile(config);
+        const dimensions = getDimensions(config);
+        width = dimensions.width;
+        height = dimensions.height;
         Object.assign(componentProps, getProps(config));
     } else {
         const relativePath = path.relative(path.dirname(outputFile), componentPath);
@@ -70,17 +86,18 @@ function buildPreviewConfig(componentPath: string) {
         importPath = "." + path.sep + relativePath.slice(0, relativePath.length - ext.length);
         codeString.push(`import MyComponent from '${importPath}'`)
     }
+    codeString.push(typeCode)
     if (!fs.existsSync(componentPath)) {
         throw new Error(`Error: Component file does not exist: ${componentPath}`);
     }
-
     const propsArg = Object.entries(componentProps)
-        .map(([k, v]) => `${k}={${typeof v === 'object' ? JSON.stringify(v, undefined, 2) : v}}`).join(" ");
+        .map(([k, v]) => `${k}={${convertToCodeString(v)}}`).join(" ");
 
+    const styleArgs = `style={{height: ${JSON.stringify(height)}, width: ${JSON.stringify(width)}}}`
     const getModeFn = `export const getMode = (): DevMode => {
         return {
             mode: "preview",
-            element: <MyComponent ${propsArg} />,
+            element: <div ${styleArgs}><${componentName} ${propsArg} /></div>,
             source: '${importPath}'
         };
     };`;
