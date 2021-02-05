@@ -4,7 +4,8 @@ import path from 'path';
 import child_process from 'child_process';
 import YAML from 'yaml';
 import {getComponentName, getDimensions, getImportStyle, getProps, PreviewConfig} from "./previewConfig";
-import * as os from "os";
+import {recoverIndex, saveIndex} from './save';
+import { convertToCodeString } from './utils';
 
 const defaultOutputFile = "./src/index.tsx";
 const baseCode = (importStmt: string, componentRender: string) => `
@@ -20,16 +21,6 @@ ReactDOM.render(
   document.getElementById('root')
 );
 `;
-
-function isFunction(functionToCheck: unknown) {
-    return {}.toString.call(functionToCheck) === '[object Function]';
-}
-function convertToCodeString(value: unknown): string {
-    if (value == null || isFunction(value)) {
-        return `${value}`;
-    }
-    return JSON.stringify(value);
-}
 
 function buildPreviewIndex(componentPath: string): string {
     const componentProps = {};
@@ -52,7 +43,7 @@ function buildPreviewIndex(componentPath: string): string {
         componentName = getComponentName(config);
         const relativePath = path.relative(path.dirname(outputFile), componentPath);
         const ext = path.extname(relativePath);
-        importPath = "." + path.sep + relativePath.slice(0, relativePath.length - ext.length);
+        importPath = "./" + relativePath.slice(0, relativePath.length - ext.length);
 
         switch (importStyle) {
             case "default":
@@ -89,30 +80,6 @@ function buildPreviewIndex(componentPath: string): string {
     return baseCode(importStmt, element);
 }
 
-function saveIndex(): {
-    data: string;
-    savedFile: string;
-} {
-    const src = path.join(process.cwd(), "src", "index.tsx");
-    const target = fs.mkdtempSync(path.join(os.tmpdir(), 'foo-'));
-    const dest = path.join(target, "index.tsx");
-    fs.copyFileSync(src, dest);
-    const data = fs.readFileSync(dest, 'utf-8');
-    return {
-        data: data,
-        savedFile: dest,
-    }
-}
-
-function recoverIndex(data: string, savedFile: string) {
-    try {
-        fs.writeFileSync(defaultOutputFile, data, 'utf-8');
-    } catch (e) {
-        fs.copyFileSync(savedFile, defaultOutputFile);
-    }
-    fs.unlinkSync(savedFile);
-}
-
 /**
  * Builds src/dev-config.ts to run the browser or to run preview
  * @param {string[]} args
@@ -124,8 +91,8 @@ async function main(args: string[]) {
             const {data, savedFile} = saveIndex();
             const newData = buildPreviewIndex(targetFile);
             fs.writeFileSync(defaultOutputFile, newData, 'utf-8');
-            process.on('SIGINT', () => recoverIndex(data, savedFile));
-            process.on('SIGTERM', () => recoverIndex(data, savedFile));
+            process.on('SIGINT', () => recoverIndex(defaultOutputFile, data, savedFile));
+            process.on('SIGTERM', () => recoverIndex(defaultOutputFile, data, savedFile));
             const childProcess = child_process.spawn('npm', ['run', 'start'],
                 {stdio: [process.stdin, process.stdout, process.stderr]});
             await onExit(childProcess);
