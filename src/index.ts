@@ -4,9 +4,8 @@ import path from 'path';
 import child_process from 'child_process';
 import YAML from 'yaml';
 import {getComponentName, getDimensions, getImportStyle, getProps, PreviewConfig} from "./previewConfig";
-import {recoverIndex, saveIndex} from './save';
 import { convertToCodeString } from './utils';
-import {getPathFromId, register, unregister} from './storage';
+import {getPathFromId, recoverIndex, register, runInitializePreviewEnv, saveIndex, unregister} from "./previewEnv";
 
 const defaultOutputFile = "./src/index.tsx";
 const baseCode = (importStmt: string, componentRender: string) => `
@@ -35,6 +34,7 @@ function buildPreviewIndex(previewPath: string): string {
     } else if (fs.existsSync(previewPath)) {
         config = YAML.parse(fs.readFileSync(previewPath, 'utf-8'));
     } else {
+        // Assume the preview path is an id.
         const file = getPathFromId(previewPath)
         if (file != null && fs.existsSync(file)) {
             config = YAML.parse(fs.readFileSync(file, 'utf-8'));
@@ -80,28 +80,34 @@ function buildPreviewIndex(previewPath: string): string {
     return baseCode(importStmt, element);
 }
 
+async function runPreview(args: string[]) {
+    const targetFile = args[0];
+    const {originalFile, data, savedFile} = saveIndex(args[1]);
+    const newData = buildPreviewIndex(targetFile);
+    fs.writeFileSync(originalFile, newData, 'utf-8');
+    process.on('SIGINT', () => recoverIndex(originalFile, data, savedFile));
+    process.on('SIGTERM', () => recoverIndex(originalFile, data, savedFile));
+    const childProcess = child_process.spawn('npm', ['run', 'start'],
+        {stdio: [process.stdin, process.stdout, process.stderr]});
+    await onExit(childProcess);
+}
+
 /**
  * Builds src/dev-config.ts to run the browser or to run preview
  * @param {string[]} args
  */
 async function main(args: string[]) {
-    const [,, mode, targetFile] = args;
+    const [,, mode, ...modeArgs] = args;
     switch (mode) {
         case "preview":
-            const {data, savedFile} = saveIndex();
-            const newData = buildPreviewIndex(targetFile);
-            fs.writeFileSync(defaultOutputFile, newData, 'utf-8');
-            process.on('SIGINT', () => recoverIndex(defaultOutputFile, data, savedFile));
-            process.on('SIGTERM', () => recoverIndex(defaultOutputFile, data, savedFile));
-            const childProcess = child_process.spawn('npm', ['run', 'start'],
-                {stdio: [process.stdin, process.stdout, process.stderr]});
-            await onExit(childProcess);
-            break;
+            return runPreview(modeArgs);
+        case "init":
+            return runInitializePreviewEnv(modeArgs);
         case "register":
-            register(targetFile);
+            register(modeArgs);
             break;
         case "unregister":
-            unregister(targetFile);
+            unregister(modeArgs);
             break;
         default:
             throw new Error("Error: Could not find an action for mode: " + mode);
