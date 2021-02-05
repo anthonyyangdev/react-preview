@@ -40,6 +40,20 @@ export function getProps(config: PreviewConfig): unknown {
     function parseNumber(number: number): number {
         return number
     }
+
+    function parseFunctionSpec(spec: JSFunctionSpec): Function {
+        const args = "(" + spec.args.join(", ") + ")";
+        const body = spec.body ?? "";
+        let fn = "";
+        if (spec.throws != null) {
+            fn = args + " => " + "{\n" + body + "\n throw new Error(" + JSON.stringify(spec.throws) + "); }";
+        } else {
+            const ret = "return " + spec.retValues.join(", ");
+            fn = args + " => " + "{\n" + body + "\n " + ret + "; }";
+        }
+        return parseFunction(fn);
+    }
+
     function parseFunction(fn: string): Function {
         return Function(`"use strict";return (${fn})`)(); // eslint-disable-line
     }
@@ -57,7 +71,6 @@ export function getProps(config: PreviewConfig): unknown {
             return props;
         }
         if ('type' in props) {
-            // const {value, type} = props as Record<'type' | 'value', unknown>;
             switch (props.type) {
                 case 'object':
                     return parseObject(props.value);
@@ -66,7 +79,10 @@ export function getProps(config: PreviewConfig): unknown {
                 case 'string':
                     return props.value;
                 case 'function':
-                    return parseFunction(props.value);
+                    if (props.spec != null) {
+                        return parseFunctionSpec(props.spec);
+                    }
+                    return parseFunction(props.value ?? "() => { return; }");
                 default:
                     throw new Error("Invalid type in preview.yaml: " + props.type);
             }
@@ -149,7 +165,14 @@ type UndefinedValue = {
 }
 
 type JSFunctionString = string;
+type JSFunctionSpec = {
+    args: unknown[];
+    retValues: unknown[];
+    body?: string;
+    throws?: string;
+};
 type FunctionValue = {
     type: "function";
-    value: JSFunctionString;
+    value?: JSFunctionString;
+    spec?: JSFunctionSpec;
 };
