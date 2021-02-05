@@ -6,7 +6,7 @@ import YAML from 'yaml';
 import {getComponentName, getDimensions, getImportStyle, getProps, PreviewConfig} from "./previewConfig";
 import {recoverIndex, saveIndex} from './save';
 import { convertToCodeString } from './utils';
-import { register, unregister } from './storage';
+import {getPathFromId, register, unregister} from './storage';
 
 const defaultOutputFile = "./src/index.tsx";
 const baseCode = (importStmt: string, componentRender: string) => `
@@ -23,56 +23,55 @@ ReactDOM.render(
 );
 `;
 
-function buildPreviewIndex(componentPath: string): string {
+function buildPreviewIndex(previewPath: string): string {
     const componentProps = {};
-    let importStmt: string = "";
+    let importStmt = "";
     let outputFile = defaultOutputFile;
-    let height = "100%";
-    let width = "100%";
 
-    let importPath: string;
-    let componentName = "MyComponent";
-    if (fs.statSync(componentPath).isDirectory()) {
-        // Find preview.yaml
-        const previewYaml = path.join(componentPath, "preview.yaml");
-        if (!fs.existsSync(previewYaml)) {
-            throw new Error("Cannot find preview.yaml file");
-        }
-        const config: PreviewConfig = YAML.parse(fs.readFileSync(previewYaml, 'utf-8'));
-        componentPath = path.join(componentPath, config.source);
-        const importStyle = getImportStyle(config);
-        componentName = getComponentName(config);
-        const relativePath = path.relative(path.dirname(outputFile), componentPath);
-        const ext = path.extname(relativePath);
-        importPath = "./" + relativePath.slice(0, relativePath.length - ext.length);
-
-        switch (importStyle) {
-            case "default":
-                importStmt = `import ${componentName} from '${importPath}'`;
-                break;
-            case "target":
-                importStmt = `import {${componentName}} from '${importPath}'`;
-                break;
-            case "namespace":
-                importStmt = `import * as ${componentName} from '${importPath}'`;
-                break;
-            case "require":
-                importStmt = `const ${componentName} = require('${importPath}')`;
-                break;
-        }
-        const dimensions = getDimensions(config);
-        width = dimensions.width;
-        height = dimensions.height;
-        Object.assign(componentProps, getProps(config));
+    let config: PreviewConfig;
+    if (fs.statSync(previewPath).isDirectory()
+        && fs.existsSync(path.join(previewPath, "preview.yaml"))) {
+        config = YAML.parse(fs.readFileSync(path.join(previewPath, "preview.yaml"), 'utf-8'));
+    } else if (fs.existsSync(previewPath)) {
+        config = YAML.parse(fs.readFileSync(previewPath, 'utf-8'));
     } else {
-        const relativePath = path.relative(path.dirname(outputFile), componentPath);
-        const ext = path.extname(relativePath);
-        importPath = "." + path.sep + relativePath.slice(0, relativePath.length - ext.length);
-        importStmt = `import MyComponent from '${importPath}'`;
+        const file = getPathFromId(previewPath)
+        if (file != null && fs.existsSync(file)) {
+            config = YAML.parse(fs.readFileSync(file, 'utf-8'));
+        } else {
+            throw new Error("Preview file not found");
+        }
     }
+
+    const componentPath = path.join(previewPath, config.source);
     if (!fs.existsSync(componentPath)) {
         throw new Error(`Error: Component file does not exist: ${componentPath}`);
     }
+
+    const componentName = getComponentName(config);
+    const relativePath = path.relative(path.dirname(outputFile), componentPath);
+    const ext = path.extname(relativePath);
+    const importPath = "./" + relativePath.slice(0, relativePath.length - ext.length);
+
+    switch (getImportStyle(config)) {
+        case "default":
+            importStmt = `import ${componentName} from '${importPath}'`;
+            break;
+        case "target":
+            importStmt = `import {${componentName}} from '${importPath}'`;
+            break;
+        case "namespace":
+            importStmt = `import * as ${componentName} from '${importPath}'`;
+            break;
+        case "require":
+            importStmt = `const ${componentName} = require('${importPath}')`;
+            break;
+    }
+    const dimensions = getDimensions(config);
+    const width = dimensions.width;
+    const height = dimensions.height;
+    Object.assign(componentProps, getProps(config));
+
     const propsArg = Object.entries(componentProps)
         .map(([k, v]) => `${k}={${convertToCodeString(v)}}`).join(" ");
     const styleArgs = `style={{height: ${JSON.stringify(height)}, width: ${JSON.stringify(width)}}}`
