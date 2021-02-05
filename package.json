@@ -11,8 +11,9 @@
     "reactjres"
   ],
   "scripts": {
-    "setup": "yarn unlink || yarn install && yarn link",
-    "setup-npm": "npm unlink || npm install && npm link"
+    "compile": "tsc -p .",
+    "setup": "yarn unlink || yarn install && yarn run compile && yarn link",
+    "setup-npm": "npm unlink || npm install && npm run compile && npm link"
   },
   "author": "Anthony Yang",
   "dependencies": {
