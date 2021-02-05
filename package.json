@@ -10,6 +10,10 @@
     "react",
     "reactjres"
   ],
+  "scripts": {
+    "setup": "yarn unlink && yarn install && yarn link",
+    "setup-npm": "npm unlink && npm install && npm link"
+  },
   "author": "Anthony Yang",
   "dependencies": {
     "@types/node": "^14.14.22",

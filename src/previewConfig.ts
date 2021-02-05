@@ -1,17 +1,9 @@
 import path from "path";
 
-const defaultOutputFile = "./src/preview-tools.tsx";
-const defaultLanguage: LanguageOutput = "ts";
 const defaultImportStyle: ImportStyle = "default"
 const defaultHeight = "auto";
 const defaultWidth = "auto";
 
-export function getOutputFile(config: PreviewConfig): string {
-    return config.output ?? defaultOutputFile;
-}
-export function getLanguage(config: PreviewConfig): LanguageOutput {
-    return config.language ?? defaultLanguage
-}
 export function getDimensions(config: PreviewConfig): {height: string, width: string} {
     return { height: config.height ?? defaultHeight, width: config.width ?? defaultWidth};
 }

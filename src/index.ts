@@ -3,30 +3,23 @@ import fs from 'fs';
 import path from 'path';
 import child_process from 'child_process';
 import YAML from 'yaml';
-import {getComponentName, getDimensions, getImportStyle, getOutputFile, getProps, PreviewConfig} from "./previewConfig";
+import {getComponentName, getDimensions, getImportStyle, getProps, PreviewConfig} from "./previewConfig";
+import * as os from "os";
 
-const defaultOutputFile = "./src/preview-tools.tsx";
-const typeCode = `
+const defaultOutputFile = "./src/index.tsx";
+const baseCode = (importStmt: string, componentRender: string) => `
 import React from 'react';
+import ReactDOM from 'react-dom';
+import './index.css';
+${importStmt}
 
-type WebsiteMode = {
-    mode: "website";
-};
-
-type PreviewMode = {
-    mode: "preview";
-    element: JSX.Element;
-    source: string;
-}
-
-export type DevMode = WebsiteMode | PreviewMode;
+ReactDOM.render(
+  <React.StrictMode>
+    ${componentRender}
+  </React.StrictMode>,
+  document.getElementById('root')
+);
 `;
-
-function buildWebsiteConfig() {
-    const getModeFn = `export const getMode = (): DevMode => {return { mode: "website" };};`;
-    const configCode = [typeCode, getModeFn];
-    fs.writeFileSync(defaultOutputFile, configCode.join("\n"));
-}
 
 function isFunction(functionToCheck: unknown) {
     return {}.toString.call(functionToCheck) === '[object Function]';
@@ -38,9 +31,9 @@ function convertToCodeString(value: unknown): string {
     return JSON.stringify(value);
 }
 
-function buildPreviewConfig(componentPath: string) {
+function buildPreviewIndex(componentPath: string): string {
     const componentProps = {};
-    const codeString: string[] = [];
+    let importStmt: string = "";
     let outputFile = defaultOutputFile;
     let height = "100%";
     let width = "100%";
@@ -63,19 +56,18 @@ function buildPreviewConfig(componentPath: string) {
 
         switch (importStyle) {
             case "default":
-                codeString.push(`import ${componentName} from '${importPath}'`)
+                importStmt = `import ${componentName} from '${importPath}'`;
                 break;
             case "target":
-                codeString.push(`import {${componentName}} from '${importPath}'`)
+                importStmt = `import {${componentName}} from '${importPath}'`;
                 break;
             case "namespace":
-                codeString.push(`import * as ${componentName} from '${importPath}'`)
+                importStmt = `import * as ${componentName} from '${importPath}'`;
                 break;
             case "require":
-                codeString.push(`const ${componentName} from require('${importPath}')`)
+                importStmt = `const ${componentName} = require('${importPath}')`;
                 break;
         }
-        outputFile = getOutputFile(config);
         const dimensions = getDimensions(config);
         width = dimensions.width;
         height = dimensions.height;
@@ -84,25 +76,41 @@ function buildPreviewConfig(componentPath: string) {
         const relativePath = path.relative(path.dirname(outputFile), componentPath);
         const ext = path.extname(relativePath);
         importPath = "." + path.sep + relativePath.slice(0, relativePath.length - ext.length);
-        codeString.push(`import MyComponent from '${importPath}'`)
+        importStmt = `import MyComponent from '${importPath}'`;
     }
-    codeString.push(typeCode)
     if (!fs.existsSync(componentPath)) {
         throw new Error(`Error: Component file does not exist: ${componentPath}`);
     }
     const propsArg = Object.entries(componentProps)
         .map(([k, v]) => `${k}={${convertToCodeString(v)}}`).join(" ");
-
     const styleArgs = `style={{height: ${JSON.stringify(height)}, width: ${JSON.stringify(width)}}}`
-    const getModeFn = `export const getMode = (): DevMode => {
-        return {
-            mode: "preview",
-            element: <div ${styleArgs}><${componentName} ${propsArg} /></div>,
-            source: '${importPath}'
-        };
-    };`;
-    codeString.push(getModeFn)
-    fs.writeFileSync(outputFile, codeString.join("\n"));
+
+    const element = `<div ${styleArgs}><${componentName} ${propsArg} /></div>`;
+    return baseCode(importStmt, element);
+}
+
+function saveIndex(): {
+    data: string;
+    savedFile: string;
+} {
+    const src = path.join(process.cwd(), "src", "index.tsx");
+    const target = fs.mkdtempSync(path.join(os.tmpdir(), 'foo-'));
+    const dest = path.join(target, "index.tsx");
+    fs.copyFileSync(src, dest);
+    const data = fs.readFileSync(dest, 'utf-8');
+    return {
+        data: data,
+        savedFile: dest,
+    }
+}
+
+function recoverIndex(data: string, savedFile: string) {
+    try {
+        fs.writeFileSync(defaultOutputFile, data, 'utf-8');
+    } catch (e) {
+        fs.copyFileSync(savedFile, defaultOutputFile);
+    }
+    fs.unlinkSync(savedFile);
 }
 
 /**
@@ -112,21 +120,19 @@ function buildPreviewConfig(componentPath: string) {
 async function main(args: string[]) {
     const [,, mode, targetFile] = args;
     switch (mode) {
-        case "add-config":
-            buildWebsiteConfig();
-            return;
-        case "website":
-            buildWebsiteConfig();
-            break;
         case "preview":
-            buildPreviewConfig(targetFile);
+            const {data, savedFile} = saveIndex();
+            const newData = buildPreviewIndex(targetFile);
+            fs.writeFileSync(defaultOutputFile, newData, 'utf-8');
+            process.on('SIGINT', () => recoverIndex(data, savedFile));
+            process.on('SIGTERM', () => recoverIndex(data, savedFile));
+            const childProcess = child_process.spawn('npm', ['run', 'start'],
+                {stdio: [process.stdin, process.stdout, process.stderr]});
+            await onExit(childProcess);
             break;
         default:
             throw new Error("Error: Could not find an action for mode: " + mode);
     }
-    const childProcess = child_process.spawn('npm', ['run', 'start'],
-        {stdio: [process.stdin, process.stdout, process.stderr]});
-    await onExit(childProcess);
 }
 
 function onExit(childProcess: child_process.ChildProcessByStdio<null, null, null>) {
