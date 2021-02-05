@@ -1,3 +1,4 @@
+import path from "path";
 
 /**
  * Returns true if the given value is a function. Otherwise, returns false.
@@ -18,4 +19,15 @@ export function convertToCodeString(value: unknown): string {
         return `${value}`;
     }
     return JSON.stringify(value);
+}
+
+/**
+ * Gets the main filename of a filename. The main filename is the name of the file excluding its extension.
+ * For example, getMainFileName("name.txt") == "name".
+ * @param fileName
+ */
+export function getMainFileName(fileName: string): string {
+    const basename = path.basename(fileName);
+    const ext = path.extname(fileName);
+    return basename.slice(0, basename.length - ext.length);
 }

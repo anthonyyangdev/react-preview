@@ -1,4 +1,4 @@
 import path from "path";
 
-export const CACHE_DIR = path.join(__dirname, "..", "cache");
+export const STORAGE_DIR = path.join(__dirname, "..", "storage");
 export const TEMP_DIR = path.join(__dirname, "..", "temp");

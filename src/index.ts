@@ -6,6 +6,7 @@ import YAML from 'yaml';
 import {getComponentName, getDimensions, getImportStyle, getProps, PreviewConfig} from "./previewConfig";
 import {recoverIndex, saveIndex} from './save';
 import { convertToCodeString } from './utils';
+import { register, unregister } from './storage';
 
 const defaultOutputFile = "./src/index.tsx";
 const baseCode = (importStmt: string, componentRender: string) => `
@@ -96,6 +97,12 @@ async function main(args: string[]) {
             const childProcess = child_process.spawn('npm', ['run', 'start'],
                 {stdio: [process.stdin, process.stdout, process.stderr]});
             await onExit(childProcess);
+            break;
+        case "register":
+            register(targetFile);
+            break;
+        case "unregister":
+            unregister(targetFile);
             break;
         default:
             throw new Error("Error: Could not find an action for mode: " + mode);

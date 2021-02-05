@@ -80,6 +80,7 @@ type LanguageOutput = "ts" | "js";
 type ImportStyle = "default" | "target" | "namespace" | "require";
 export type PreviewConfig = {
     source: string;
+    id?: string;
     componentName?: string;
 
     // Defaults to src/preview-tools.tsx
