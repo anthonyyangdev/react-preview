@@ -126,7 +126,7 @@ async function runPreview(args: string[]) {
 async function main(args: string[]) {
     const [,, mode, ...modeArgs] = args;
     switch (mode) {
-        case "preview":
+        case "run":
             return runPreview(modeArgs);
         case "init":
             return runInitializePreviewEnv(modeArgs);
