@@ -43,13 +43,13 @@ export function getProps(config: PreviewConfig): unknown {
     }
 
     function parseFunctionSpec(spec: JSFunctionSpec): Function {
-        const args = "(" + spec.args.join(", ") + ")";
+        const args = "(" + (spec.args ?? []).join(", ") + ")";
         const body = spec.body ?? "";
-        let fn = "";
+        let fn: string;
         if (spec.throws != null) {
             fn = args + " => " + "{\n" + body + "\n throw new Error(" + JSON.stringify(spec.throws) + "); }";
         } else {
-            const ret = "return " + spec.retValues.join(", ");
+            const ret = "return " + (spec.retValues?? []).join(", ");
             fn = args + " => " + "{\n" + body + "\n " + ret + "; }";
         }
         return parseFunction(fn);
@@ -168,8 +168,8 @@ type UndefinedValue = {
 
 type JSFunctionString = string;
 type JSFunctionSpec = {
-    args: unknown[];
-    retValues: unknown[];
+    args?: unknown[];
+    retValues?: unknown[];
     body?: string;
     throws?: string;
 };
