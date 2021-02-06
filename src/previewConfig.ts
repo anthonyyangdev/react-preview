@@ -4,11 +4,12 @@ const defaultImportStyle: ImportStyle = "default"
 const defaultHeight = "auto";
 const defaultWidth = "auto";
 
-export function getDimensions(config: PreviewConfig): {height: string, width: string} {
-    return { height: config.height ?? defaultHeight, width: config.width ?? defaultWidth};
-}
 export function getImportStyle(config: PreviewConfig): ImportStyle {
     return config.importStyle ?? defaultImportStyle;
+}
+export function getReactStyles(config: PreviewConfig): Record<string, unknown> {
+    const dimensions = { height: config.height ?? defaultHeight, width: config.width ?? defaultWidth};
+    return Object.assign(dimensions, config.styles ?? {});
 }
 export function getComponentName(config: PreviewConfig): string {
     const {componentName, source} = config;
@@ -111,6 +112,7 @@ export type PreviewConfig = {
     // Defaults to "default", i.e. "import name from './Component'"
     importStyle?: "default" | "target" | "namespace" | "require";
     props?: PropsConfig;
+    styles?: Record<string, unknown>
 };
 
 export type PropsConfig =

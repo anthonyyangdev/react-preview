@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import child_process from 'child_process';
 import YAML from 'yaml';
-import {getComponentName, getDimensions, getImportStyle, getProps, PreviewConfig} from "./previewConfig";
+import {getComponentName, getImportStyle, getProps, getReactStyles, PreviewConfig} from "./previewConfig";
 import { convertToCodeString } from './utils';
 import {getPathFromId, recoverIndex, register, runInitializePreviewEnv, saveIndex, unregister} from "./previewEnv";
 
@@ -22,28 +22,32 @@ ReactDOM.render(
 );
 `;
 
-function buildPreviewIndex(previewPath: string): string {
-    const componentProps = {};
-    let importStmt = "";
-    let outputFile = defaultOutputFile;
-
-    let config: PreviewConfig;
-    if (fs.statSync(previewPath).isDirectory()
-        && fs.existsSync(path.join(previewPath, "preview.yaml"))) {
-        config = YAML.parse(fs.readFileSync(path.join(previewPath, "preview.yaml"), 'utf-8'));
-    } else if (fs.existsSync(previewPath)) {
-        config = YAML.parse(fs.readFileSync(previewPath, 'utf-8'));
-    } else {
-        // Assume the preview path is an id.
-        const file = getPathFromId(previewPath)
-        if (file != null && fs.existsSync(file)) {
-            config = YAML.parse(fs.readFileSync(file, 'utf-8'));
-        } else {
-            throw new Error("Preview file not found");
+/**
+ * Resolves the path the target argument for run-preview, which may either be a preview file, a directory
+ * which contains a preview file, or a registered id with a path to the preview file.
+ * @param targetArg
+ */
+function resolvePreviewFileArg(targetArg: string): string {
+    if (fs.existsSync(targetArg)) {
+        // may be a directory or file
+        if (fs.statSync(targetArg).isDirectory()) {
+            const previewFile = path.join(targetArg, "preview.yaml");
+            if (fs.existsSync(previewFile)) {
+                return previewFile;
+            }
+        } else if (fs.statSync(targetArg).isFile()) {
+            return targetArg;
         }
     }
+    return getPathFromId(targetArg);
+}
 
-    const componentPath = path.join(previewPath, config.source);
+function buildPreviewIndex(previewFile: string): string {
+    const componentProps = {};
+    const outputFile = defaultOutputFile;
+
+    const config = YAML.parse(fs.readFileSync(path.join(previewFile, "preview.yaml"), 'utf-8'));
+    const componentPath = path.join(previewFile, config.source);
     if (!fs.existsSync(componentPath)) {
         throw new Error(`Error: Component file does not exist: ${componentPath}`);
     }
@@ -53,6 +57,7 @@ function buildPreviewIndex(previewPath: string): string {
     const ext = path.extname(relativePath);
     const importPath = "./" + relativePath.slice(0, relativePath.length - ext.length);
 
+    let importStmt = "";
     switch (getImportStyle(config)) {
         case "default":
             importStmt = `import ${componentName} from '${importPath}'`;
@@ -67,23 +72,24 @@ function buildPreviewIndex(previewPath: string): string {
             importStmt = `const ${componentName} = require('${importPath}')`;
             break;
     }
-    const dimensions = getDimensions(config);
-    const width = dimensions.width;
-    const height = dimensions.height;
     Object.assign(componentProps, getProps(config));
 
     const propsArg = Object.entries(componentProps)
         .map(([k, v]) => `${k}={${convertToCodeString(v)}}`).join(" ");
-    const styleArgs = `style={{height: ${JSON.stringify(height)}, width: ${JSON.stringify(width)}}}`
-
+    const styleArgs = `style={{${JSON.stringify(getReactStyles(config))}}}`
     const element = `<div ${styleArgs}><${componentName} ${propsArg} /></div>`;
     return baseCode(importStmt, element);
 }
 
 async function runPreview(args: string[]) {
-    const targetFile = args[0];
+    const target = args[0];
+    if (target !== undefined) {
+        throw new Error("Must provide a target preview file, a directory which contains the preview file, or a" +
+            " registered id");
+    }
     const {originalFile, data, savedFile} = saveIndex(args[1]);
-    const newData = buildPreviewIndex(targetFile);
+    const previewFile = resolvePreviewFileArg(target);
+    const newData = buildPreviewIndex(previewFile);
     fs.writeFileSync(originalFile, newData, 'utf-8');
     process.on('SIGINT', () => recoverIndex(originalFile, data, savedFile));
     process.on('SIGTERM', () => recoverIndex(originalFile, data, savedFile));
@@ -94,7 +100,6 @@ async function runPreview(args: string[]) {
 
 /**
  * Builds src/dev-config.ts to run the browser or to run preview
- * @param {string[]} args
  */
 async function main(args: string[]) {
     const [,, mode, ...modeArgs] = args;
@@ -104,11 +109,9 @@ async function main(args: string[]) {
         case "init":
             return runInitializePreviewEnv(modeArgs);
         case "register":
-            register(modeArgs);
-            break;
+            return register(modeArgs);
         case "unregister":
-            unregister(modeArgs);
-            break;
+            return unregister(modeArgs);
         default:
             throw new Error("Error: Could not find an action for mode: " + mode);
     }

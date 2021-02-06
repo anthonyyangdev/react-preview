@@ -3,16 +3,16 @@ import path from "path";
 import {PreviewConfig} from "./previewConfig";
 import YAML from "yaml";
 import {getMainFileName} from "./utils";
-import {STORAGE_DIR, TEMP_DIR} from "./constants";
+
+const PREVIEW_ENV_PATH = path.join(process.cwd(), "preview");
 
 function isInitialized() {
-    return fs.existsSync(path.join(process.cwd(), "preview"))
-        && fs.statSync(path.join(process.cwd(), "preview")).isDirectory();
+    return fs.existsSync(PREVIEW_ENV_PATH)
+        && fs.statSync(PREVIEW_ENV_PATH).isDirectory();
 }
 
 export function runInitializePreviewEnv(args: string[]) {
-    const name = args.length > 0 ? args[0] : "preview";
-    const target = path.join(process.cwd(), name);
+    const target = PREVIEW_ENV_PATH;
     if (fs.existsSync(target)) {
         throw new Error("Error: preview environment target already exists: " + target);
     }
@@ -30,18 +30,18 @@ export function register(args: string[]) {
     const target = args[0];
     const config: PreviewConfig = YAML.parse(target);
     const id = config.id ?? getMainFileName(target);
-    fs.writeFileSync(path.join(STORAGE_DIR, id), path.resolve(target));
+    fs.writeFileSync(path.join(PREVIEW_ENV_PATH, "storage", id), path.resolve(target));
 }
 
 export function unregister(args: string[]) {
     const id = args[0];
-    fs.unlinkSync(path.join(STORAGE_DIR, id))
+    fs.unlinkSync(path.join(PREVIEW_ENV_PATH, "storage", id))
 }
 
-export function getPathFromId(id: string): string | undefined {
-    const target = path.join(STORAGE_DIR, id)
+export function getPathFromId(id: string): string {
+    const target = path.join(PREVIEW_ENV_PATH, "storage", id)
     if (!fs.existsSync(target)) {
-        return undefined;
+        throw new Error(`Error: Could not find path associated with id ${id}`);
     }
     return fs.readFileSync(target, 'utf-8')
 }
@@ -56,7 +56,7 @@ export function saveIndex(srcFile?: string): {
     savedFile: string;
 } {
     const src = srcFile ?? path.join(process.cwd(), "src", "index.tsx");
-    const dest = path.join(TEMP_DIR, "index.tsx");
+    const dest = path.join(PREVIEW_ENV_PATH, "temp", "index.tsx");
     fs.copyFileSync(src, dest);
     const data = fs.readFileSync(dest, 'utf-8');
     return {
