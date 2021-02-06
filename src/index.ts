@@ -5,7 +5,15 @@ import child_process from 'child_process';
 import YAML from 'yaml';
 import {getComponentName, getImportStyle, getProps, getReactStyles, PreviewConfig} from "./previewConfig";
 import { convertToCodeString } from './utils';
-import {getPathFromId, recoverIndex, register, runInitializePreviewEnv, saveIndex, unregister} from "./previewEnv";
+import {
+    getPathFromId,
+    recoverIndex,
+    register,
+    runInitializePreviewEnv,
+    runningInstanceExists,
+    saveIndex,
+    unregister
+} from "./previewEnv";
 
 const defaultOutputFile = "./src/index.tsx";
 const baseCode = (importStmt: string, componentRender: string) => `
@@ -49,7 +57,7 @@ function buildPreviewIndex(previewFile: string): string {
     const config = YAML.parse(fs.readFileSync(previewFile, 'utf-8'));
     const componentPath = path.join(path.dirname(previewFile), config.source);
     if (!fs.existsSync(componentPath)) {
-        throw new Error(`Error: Component file does not exist: ${componentPath}`);
+        throw new Error(`Component file does not exist: ${componentPath}`);
     }
 
     const componentName = getComponentName(config);
@@ -82,17 +90,31 @@ function buildPreviewIndex(previewFile: string): string {
 }
 
 async function runPreview(args: string[]) {
+    if (runningInstanceExists()) {
+        throw new Error("Cannot run preview because there is already another instance running.");
+    }
+
     const target = args[0];
     if (target === undefined) {
         throw new Error("Must provide a target preview file, a directory which contains the preview file, or a" +
             " registered id");
     }
-    const {originalFile, data, savedFile} = saveIndex(args[1]);
+    let {originalFile, savedData, savedFile} = saveIndex(args[1]);
     const previewFile = resolvePreviewFileArg(target);
     const newData = buildPreviewIndex(previewFile);
     fs.writeFileSync(originalFile, newData, 'utf-8');
-    process.on('SIGINT', () => recoverIndex(originalFile, data, savedFile));
-    process.on('SIGTERM', () => recoverIndex(originalFile, data, savedFile));
+    const fileWatcher = fs.watch(previewFile, (curr, prev) => {
+        try {
+            const newData = buildPreviewIndex(previewFile);
+            fs.writeFileSync(originalFile, newData, 'utf-8');
+        } catch (e) {}
+    });
+    const cleanup = () => {
+        fileWatcher.close();
+        recoverIndex(originalFile, savedData, savedFile);
+    };
+    process.on('SIGINT', cleanup);
+    process.on('SIGTERM', cleanup);
     const childProcess = child_process.spawn('npm', ['run', 'start'],
         {stdio: [process.stdin, process.stdout, process.stderr]});
     await onExit(childProcess);
@@ -113,16 +135,14 @@ async function main(args: string[]) {
         case "unregister":
             return unregister(modeArgs);
         default:
-            throw new Error("Error: Could not find an action for mode: " + mode);
+            throw new Error("Could not find an action for mode: " + mode);
     }
 }
 
 function onExit(childProcess: child_process.ChildProcessByStdio<null, null, null>) {
     return new Promise((resolve, reject) => {
-        childProcess.once('exit', (code) => {
-            if (code === 0) {
-                resolve(undefined);
-            }
+        childProcess.once('exit', () => {
+            resolve(undefined);
         });
         childProcess.once('error', (err) => {
             reject(err);
@@ -132,4 +152,4 @@ function onExit(childProcess: child_process.ChildProcessByStdio<null, null, null
 
 main(process.argv)
     .then(() => console.log("Process complete"))
-    .catch(e => console.log("Error: " + e));
+    .catch(e => console.log(`${e}`));
