@@ -28,7 +28,7 @@ export function runInitializePreviewEnv(args: string[]) {
  */
 export function register(args: string[]) {
     const target = args[0];
-    const config: PreviewConfig = YAML.parse(target);
+    const config: PreviewConfig = YAML.parse(fs.readFileSync(target, 'utf-8'));
     const id = config.id ?? getMainFileName(target);
     fs.writeFileSync(path.join(PREVIEW_ENV_PATH, "storage", id), path.resolve(target));
 }
