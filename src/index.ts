@@ -47,7 +47,7 @@ function buildPreviewIndex(previewFile: string): string {
     const outputFile = defaultOutputFile;
 
     const config = YAML.parse(fs.readFileSync(previewFile, 'utf-8'));
-    const componentPath = path.join(previewFile, config.source);
+    const componentPath = path.join(path.dirname(previewFile), config.source);
     if (!fs.existsSync(componentPath)) {
         throw new Error(`Error: Component file does not exist: ${componentPath}`);
     }
@@ -76,7 +76,7 @@ function buildPreviewIndex(previewFile: string): string {
 
     const propsArg = Object.entries(componentProps)
         .map(([k, v]) => `${k}={${convertToCodeString(v)}}`).join(" ");
-    const styleArgs = `style={{${JSON.stringify(getReactStyles(config))}}}`
+    const styleArgs = `style={${JSON.stringify(getReactStyles(config))}}`
     const element = `<div ${styleArgs}><${componentName} ${propsArg} /></div>`;
     return baseCode(importStmt, element);
 }
@@ -122,8 +122,6 @@ function onExit(childProcess: child_process.ChildProcessByStdio<null, null, null
         childProcess.once('exit', (code) => {
             if (code === 0) {
                 resolve(undefined);
-            } else {
-                reject(new Error('Exit with error code: '+code));
             }
         });
         childProcess.once('error', (err) => {

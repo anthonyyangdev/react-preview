@@ -9,7 +9,7 @@ export function getImportStyle(config: PreviewConfig): ImportStyle {
 }
 export function getReactStyles(config: PreviewConfig): Record<string, unknown> {
     const dimensions = { height: config.height ?? defaultHeight, width: config.width ?? defaultWidth};
-    return Object.assign(dimensions, config.styles ?? {});
+    return Object.assign(dimensions, config.style ?? {});
 }
 export function getComponentName(config: PreviewConfig): string {
     const {componentName, source} = config;
@@ -112,7 +112,7 @@ export type PreviewConfig = {
     // Defaults to "default", i.e. "import name from './Component'"
     importStyle?: "default" | "target" | "namespace" | "require";
     props?: PropsConfig;
-    styles?: Record<string, unknown>
+    style?: Record<string, unknown>
 };
 
 export type PropsConfig =
