@@ -46,7 +46,7 @@ function buildPreviewIndex(previewFile: string): string {
     const componentProps = {};
     const outputFile = defaultOutputFile;
 
-    const config = YAML.parse(fs.readFileSync(path.join(previewFile, "preview.yaml"), 'utf-8'));
+    const config = YAML.parse(fs.readFileSync(previewFile, 'utf-8'));
     const componentPath = path.join(previewFile, config.source);
     if (!fs.existsSync(componentPath)) {
         throw new Error(`Error: Component file does not exist: ${componentPath}`);
