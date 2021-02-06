@@ -1,8 +1,8 @@
 import path from "path";
 
 const defaultImportStyle: ImportStyle = "default"
-const defaultHeight = "auto";
-const defaultWidth = "auto";
+const defaultHeight = "100%";
+const defaultWidth = "100%";
 
 export function getImportStyle(config: PreviewConfig): ImportStyle {
     return config.importStyle ?? defaultImportStyle;
