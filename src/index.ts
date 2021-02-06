@@ -83,7 +83,7 @@ function buildPreviewIndex(previewFile: string): string {
 
 async function runPreview(args: string[]) {
     const target = args[0];
-    if (target !== undefined) {
+    if (target === undefined) {
         throw new Error("Must provide a target preview file, a directory which contains the preview file, or a" +
             " registered id");
     }
