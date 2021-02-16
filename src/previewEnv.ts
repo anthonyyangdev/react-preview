@@ -81,7 +81,7 @@ export function saveIndex(srcFile?: string): {
 
     const savedFile = path.join(PREVIEW_ENV_PATH, "temp", Date.now().toString() + ".tsx");
     fs.copyFileSync(originalFile, savedFile);
-    fs.chmodSync(originalFile, 600);
+    // fs.chmodSync(originalFile, 777);
     const savedData = fs.readFileSync(savedFile, 'utf-8');
     return {
         originalFile,
