@@ -17,6 +17,9 @@ import {
 
 const defaultOutputFile = "./src/index.tsx";
 const baseCode = (importStmt: string, componentRender: string) => `
+// This content was auto-generated! DO NOT ATTEMPT TO EDIT OR REMOVE
+// THIS FILE ONLY HAS READ PERMISSION
+
 import React from 'react';
 import ReactDOM from 'react-dom';
 import './index.css';
@@ -99,7 +102,7 @@ async function runPreview(args: string[]) {
         throw new Error("Must provide a target preview file, a directory which contains the preview file, or a" +
             " registered id");
     }
-    let {originalFile, savedData, savedFile} = saveIndex(args[1]);
+    let {originalFile, savedData, savedFile, originalMode} = saveIndex(args[1]);
     const previewFile = resolvePreviewFileArg(target);
     const newData = buildPreviewIndex(previewFile);
     fs.writeFileSync(originalFile, newData, 'utf-8');
@@ -111,7 +114,7 @@ async function runPreview(args: string[]) {
     });
     const cleanup = () => {
         fileWatcher.close();
-        recoverIndex(originalFile, savedData, savedFile);
+        recoverIndex(originalFile, savedData, savedFile, originalMode);
     };
     process.on('SIGINT', cleanup);
     process.on('SIGTERM', cleanup);

@@ -1,4 +1,4 @@
-import fs from "fs";
+import fs, {chmodSync} from "fs";
 import path from "path";
 import {PreviewConfig} from "./previewConfig";
 import YAML from "yaml";
@@ -68,15 +68,26 @@ export function saveIndex(srcFile?: string): {
     originalFile: string;
     savedData: string;
     savedFile: string;
+    originalMode: number;
 } {
-    const src = srcFile ?? path.join(process.cwd(), "src", "index.tsx");
-    const dest = path.join(PREVIEW_ENV_PATH, "temp", Date.now().toString() + ".tsx");
-    fs.copyFileSync(src, dest);
-    const data = fs.readFileSync(dest, 'utf-8');
+    const originalFile = srcFile ?? path.join(process.cwd(), "src", "index.tsx");
+    try {
+        fs.accessSync(originalFile, fs.constants.W_OK);
+        fs.accessSync(originalFile, fs.constants.R_OK);
+    } catch (e) {
+        throw new Error(e);
+    }
+    const originalMode = fs.statSync(originalFile).mode;
+
+    const savedFile = path.join(PREVIEW_ENV_PATH, "temp", Date.now().toString() + ".tsx");
+    fs.copyFileSync(originalFile, savedFile);
+    fs.chmodSync(originalFile, 400);
+    const savedData = fs.readFileSync(savedFile, 'utf-8');
     return {
-        originalFile: src,
-        savedData: data,
-        savedFile: dest,
+        originalFile,
+        savedFile,
+        savedData,
+        originalMode
     }
 }
 
@@ -86,8 +97,15 @@ export function saveIndex(srcFile?: string): {
  * @param originalFile
  * @param data
  * @param savedFile
+ * @param originalMode
  */
-export function recoverIndex(originalFile: string, data: string, savedFile: string) {
+export function recoverIndex(
+    originalFile: string,
+    data: string,
+    savedFile: string,
+    originalMode: number
+) {
+    fs.chmodSync(originalFile, originalMode);
     try {
         fs.writeFileSync(originalFile, data, 'utf-8');
     } catch (e) {
