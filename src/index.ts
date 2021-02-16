@@ -18,7 +18,6 @@ import {
 const defaultOutputFile = "./src/index.tsx";
 const baseCode = (importStmt: string, componentRender: string) => `
 // This content was auto-generated! DO NOT ATTEMPT TO EDIT OR REMOVE
-// THIS FILE ONLY HAS READ PERMISSION
 
 import React from 'react';
 import ReactDOM from 'react-dom';
