@@ -118,7 +118,8 @@ function getIndexFilenameAndLanguage(directory?: string) {
     if (!fs.existsSync(directory)) {
         throw new Error(`Directory ${directory} does not exist.`);
     }
-    const tscConfig = path.join(directory, "tsconfig.json");
+    const cwd = process.cwd();
+    const tscConfig = path.join(cwd, "tsconfig.json");
     let indexFilename: string;
     let language: "ts" | "js";
     if (fs.existsSync(tscConfig)) {
