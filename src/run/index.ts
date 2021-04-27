@@ -6,6 +6,7 @@ import {getComponentName, getImportStyle, getProps, getReactStyles, PreviewConfi
 import {convertToCodeString} from "../utils";
 import * as uuid from "uuid";
 import {REACT_PREVIEW_DIR} from "../constants";
+import * as readline from "readline";
 
 
 const baseCode = (importStmt: string, componentRender: string) => `
@@ -30,20 +31,49 @@ ReactDOM.render(
  * which contains a preview file.
  * @param targetArg
  */
-function resolvePreviewFileArg(targetArg: string): string {
+async function resolvePreviewFileArg(targetArg: string): Promise<string> {
     if (!fs.existsSync(targetArg)) {
-        throw new Error(`Cannot find directory or preview file named ${targetArg}`);
+        throw new Error(`Cannot find directory or file named ${targetArg}`);
     }
     // may be a directory or file
+    let previewFile: string;
+    let sourceFile: string;
     if (fs.statSync(targetArg).isDirectory()) {
-        const previewFile = path.join(targetArg, "preview.yaml");
-        if (fs.existsSync(previewFile)) {
-            return previewFile;
-        }
+        previewFile = path.join(targetArg, "preview.yaml");
     } else if (fs.statSync(targetArg).isFile()) {
-        return targetArg;
+        const ext = path.extname(targetArg);
+        if ([".yaml", ".yml"].includes(ext)) {
+            previewFile = targetArg;
+        } else {
+            previewFile = path.join(path.dirname(targetArg), "preview.yaml");
+        }
+        if (['tsx', 'ts', 'js', 'jsx'].includes(targetArg)) {
+            sourceFile = targetArg;
+        }
+    } else {
+        throw new Error(`Cannot OPEN ${targetArg}`);
     }
-    throw new Error(`Cannot OPEN ${targetArg}`);
+    if (fs.existsSync(previewFile)) {
+        return previewFile;
+    }
+    console.log(`Cannot find a preview file at ${previewFile}`);
+    const rl = readline.createInterface({
+        input: process.stdin,
+        output: process.stdout
+    });
+
+    return new Promise((_, reject) => {
+        rl.question("Do you want to create a template preview file? ", answer => {
+            if (['y', 'yes', 'ok', 'yep', 'yeah'].includes(answer.toLowerCase())) {
+                fs.writeFileSync(previewFile, `
+source: ${path.relative(path.dirname(previewFile), sourceFile)}
+props: {}
+`, 'utf-8');
+            }
+            rl.close();
+            reject('Process ended');
+        });
+    });
 }
 
 function buildPreviewIndex(previewFile: string, indexFile: string): string {
@@ -130,7 +160,8 @@ export function runningInstanceExists(indexFilename: string) {
 export default async function runPreview(args: string[]) {
     const target = args[0];
     if (target === undefined) {
-        throw new Error("Must provide a target preview file, a directory which contains the preview file");
+        throw new Error("Must provide a target preview file, a directory which contains the preview file, or a React" +
+            " file.");
     }
     const {indexFilename, language} = getIndexFilenameAndLanguage(args[1]);
     if (runningInstanceExists(indexFilename)) {
@@ -157,7 +188,7 @@ export default async function runPreview(args: string[]) {
         fs.writeFileSync(newSaveFile, JSON.stringify(saveData), 'utf-8');
     }
 
-    const previewFile = resolvePreviewFileArg(target);
+    const previewFile = await resolvePreviewFileArg(target);
     const newData = buildPreviewIndex(previewFile, indexFilename);
     fs.writeFileSync(indexFilename, newData, 'utf-8');
     const fileWatcher = fs.watch(previewFile, () => {
