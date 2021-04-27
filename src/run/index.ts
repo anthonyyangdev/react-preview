@@ -47,7 +47,7 @@ async function resolvePreviewFileArg(targetArg: string): Promise<string> {
         } else {
             previewFile = path.join(path.dirname(targetArg), "preview.yaml");
         }
-        if (['tsx', 'ts', 'js', 'jsx'].includes(targetArg)) {
+        if (['.tsx', '.ts', '.js', '.jsx'].includes(ext)) {
             sourceFile = targetArg;
         }
     } else {
@@ -66,7 +66,7 @@ async function resolvePreviewFileArg(targetArg: string): Promise<string> {
         rl.question("Do you want to create a template preview file? ", answer => {
             if (['y', 'yes', 'ok', 'yep', 'yeah'].includes(answer.toLowerCase())) {
                 fs.writeFileSync(previewFile, `
-source: ${path.relative(path.dirname(previewFile), sourceFile)}
+source: ${sourceFile ? path.relative(path.dirname(previewFile), sourceFile) : './sourceFileName.tsx'}
 props: {}
 `, 'utf-8');
             }
