@@ -7,6 +7,7 @@ import {convertToCodeString} from "../utils";
 import * as uuid from "uuid";
 import {REACT_PREVIEW_DIR} from "../constants";
 import * as readline from "readline";
+import getPort from "get-port";
 
 
 const baseCode = (importStmt: string, componentRender: string) => `
@@ -208,8 +209,12 @@ export default async function runPreview(args: string[]) {
     process.on('SIGINT', cleanup);
     process.on('SIGTERM', cleanup);
     const command = fs.existsSync(path.join(process.cwd(), "yarn.lock")) ? "yarn" : "npm";
+    const PORT = await getPort()
     const childProcess = child_process.spawn(command, ['run', 'start'],
-        {stdio: [process.stdin, process.stdout, process.stderr]});
+        {
+            stdio: [process.stdin, process.stdout, process.stderr],
+            env: {...process.env, PORT: PORT.toString()}
+        });
     await onExit(childProcess);
 }
 

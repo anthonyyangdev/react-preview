@@ -4,6 +4,75 @@ const defaultImportStyle: ImportStyle = "default"
 const defaultHeight = "100%";
 const defaultWidth = "100%";
 
+
+const parse = {
+    object(object: Record<string, PropsConfig>) {
+        const value: Record<string, unknown> = {};
+        Object.entries(object).forEach(([k, v]) => {
+            return value[k] = this.value(v);
+        });
+        return value;
+    },
+    functionSpec(spec: JSFunctionSpec): Function {
+        const args = "(" + (spec.args ?? []).join(", ") + ")";
+        const body = spec.body ?? "";
+        let fn: string;
+        if (spec.throws != null) {
+            fn = args + " => " + "{\n" + body + "\n throw new Error(" + JSON.stringify(spec.throws) + "); }";
+        } else {
+            const ret = "return " + (spec.retValues?? []).join(", ");
+            fn = args + " => " + "{\n" + body + "\n " + ret + "; }";
+        }
+        return this.function(fn);
+    },
+    function(fn: string): Function {
+        return Function(`"use strict";return (${fn})`)(); // eslint-disable-line
+    },
+    array(arr: PropsConfig[]): unknown[] {
+        return arr.map(this.value);
+    },
+    value(props: PropsConfig): unknown {
+        if (Array.isArray(props)) {
+            return this.array(props);
+        }
+        if (typeof props !== "object") {
+            return props;
+        }
+        if (props == null) {
+            return props;
+        }
+        if ('type' in props) {
+            switch (props.type) {
+                case "array":
+                    return this.array(props.value)
+                case "boolean":
+                    return props.value
+                case "null":
+                    return null;
+                case "undefined":
+                    return undefined;
+                case 'object':
+                    return this.object(props.value);
+                case 'number':
+                    return props.value;
+                case 'string':
+                    return props.value;
+                case 'function':
+                    if (props.spec != null) {
+                        return this.functionSpec(props.spec);
+                    }
+                    if (props.value != null) {
+                        return this.function(props.value);
+                    }
+                    throw new Error(`Function is not defined. Please define via either 'spec' or 'value'`)
+            }
+            throw new Error("Invalid type in preview.yaml: " + props.type + "\n"
+                + "Must be one of: [array, boolean, null, undefined, object, number, string, function]");
+        }
+        return this.object(props);
+    }
+};
+
 export function getImportStyle(config: PreviewConfig): ImportStyle {
     return config.importStyle ?? defaultImportStyle;
 }
@@ -30,67 +99,7 @@ export function getComponentName(config: PreviewConfig): string {
  * @param config
  */
 export function getProps(config: PreviewConfig): unknown {
-    function parseObject(object: Record<string, PropsConfig>) {
-        const value: Record<string, unknown> = {};
-        Object.entries(object).forEach(([k, v]) => {
-            return value[k] = parseValue(v);
-        });
-        return value;
-    }
-
-    function parseNumber(number: number): number {
-        return number
-    }
-
-    function parseFunctionSpec(spec: JSFunctionSpec): Function {
-        const args = "(" + (spec.args ?? []).join(", ") + ")";
-        const body = spec.body ?? "";
-        let fn: string;
-        if (spec.throws != null) {
-            fn = args + " => " + "{\n" + body + "\n throw new Error(" + JSON.stringify(spec.throws) + "); }";
-        } else {
-            const ret = "return " + (spec.retValues?? []).join(", ");
-            fn = args + " => " + "{\n" + body + "\n " + ret + "; }";
-        }
-        return parseFunction(fn);
-    }
-
-    function parseFunction(fn: string): Function {
-        return Function(`"use strict";return (${fn})`)(); // eslint-disable-line
-    }
-    function parseArray(arr: PropsConfig[]): unknown[] {
-        return arr.map(parseValue);
-    }
-    function parseValue(props: PropsConfig): unknown {
-        if (Array.isArray(props)) {
-            return parseArray(props);
-        }
-        if (typeof props !== "object") {
-            return props;
-        }
-        if (props == null) {
-            return props;
-        }
-        if ('type' in props) {
-            switch (props.type) {
-                case 'object':
-                    return parseObject(props.value);
-                case 'number':
-                    return parseNumber(props.value);
-                case 'string':
-                    return props.value;
-                case 'function':
-                    if (props.spec != null) {
-                        return parseFunctionSpec(props.spec);
-                    }
-                    return parseFunction(props.value ?? "() => { return; }");
-                default:
-                    throw new Error("Invalid type in preview.yaml: " + props.type);
-            }
-        }
-        return parseObject(props);
-    }
-    return config.props ? parseValue(config.props) : {};
+    return config.props ? parse.value(config.props) : {};
 }
 
 type LanguageOutput = "ts" | "js";
