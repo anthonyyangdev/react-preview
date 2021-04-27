@@ -7,6 +7,11 @@
   resolved "https://registry.yarnpkg.com/@types/node/-/node-14.14.22.tgz#0d29f382472c4ccf3bd96ff0ce47daf5b7b84b18"
   integrity sha512-g+f/qj/cNcqKkc3tFqlXOYjrmZA+jNBiDzbP3kH+B+otKFqAdPgVTGP1IeKRdMml/aE69as5S4FqtxAbl+LaMw==
 
+"@types/uuid@^8.3.0":
+  version "8.3.0"
+  resolved "https://registry.yarnpkg.com/@types/uuid/-/uuid-8.3.0.tgz#215c231dff736d5ba92410e6d602050cce7e273f"
+  integrity sha512-eQ9qFW/fhfGJF8WKHGEHZEyVWfZxrT+6CLIJGBcZPfxUh/+BnEj+UCGYMlr9qZuX/2AltsvwrGqp0LhEW8D0zQ==
+
 "@types/yaml@^1.9.7":
   version "1.9.7"
   resolved "https://registry.yarnpkg.com/@types/yaml/-/yaml-1.9.7.tgz#2331f36e0aac91311a63d33eb026c21687729679"
@@ -25,6 +30,11 @@ node@^15.7.0:
   integrity sha512-yVFRy6PA/s9bB2m9nKS5Ny965dx+RRQWiID5lIerYVLaT1nypJC4UsD/HdqSqg1wL8aDOP/Wz779f/ND1orI3g==
   dependencies:
     node-bin-setup "^1.0.0"
+
+uuid@^8.3.2:
+  version "8.3.2"
+  resolved "https://registry.yarnpkg.com/uuid/-/uuid-8.3.2.tgz#80d5b5ced271bb9af6c445f21a1a04c606cefbe2"
+  integrity sha512-+NYs2QeMWy+GWFOEm9xnn6HCDp0l7QBD7ml8zLUmJ+93Q5NF0NocErnwkTkXVFNiX3/fpC6afS8Dhb/gz7R7eg==
 
 yaml@*, yaml@^1.10.0:
   version "1.10.0"
